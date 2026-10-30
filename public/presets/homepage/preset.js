@@ -290,12 +290,12 @@ function latestRail(items, live, ctx) {
 function sectionRow(blocks, ctx) {
   const { h } = ctx;
   return h('div', { class: 'hp-sections' },
-    blocks.map(block =>
+    blocks.map(block => kit.section(
       h('section', { class: 'hp-section' },
         h('h3', { class: 'hp-label' }, block.name),
         card(block.items[0], ctx),
         h('ul', { class: 'hp-list' }, block.items.slice(1).map(item => listItem(item, ctx))),
-      )),
+      ), block)),
   );
 }
 

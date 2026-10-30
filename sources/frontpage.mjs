@@ -1,7 +1,8 @@
 // The front page: a provider's own front-page order, the newest stories per
 // section and the running liveblogs, as one payload for the front-page wallpapers.
 // The settings (settings.mjs, or the app's settings file) pick the provider,
-// the sections and whether running live stories lead the page (`liveFirst`).
+// the sections, and whether running live stories lead the page (`liveFirst`):
+// how many (`liveLeads`) and in which order (`liveOrder`).
 // Every story appears once in `top` + `sections` (deduplicated by URL, a
 // liveblog by its stream id: its URL follows its headline); `live` and
 // `latest` are views across the whole site and may repeat them.
@@ -51,7 +52,7 @@ function sectionsOf(outlet) {
 }
 
 export async function getFrontpage({
-  provider, sections, liveFirst = true, perSection = 6, latest = 20,
+  provider, sections, liveFirst = true, liveOrder = [], liveLeads = 3, perSection = 6, latest = 20,
 } = {}) {
   const p = getProvider(provider);
   const { top, latest: all, live: index } = frontOf(p.id);
@@ -64,7 +65,7 @@ export async function getFrontpage({
   const loaded = rest.map(r => r.status === 'fulfilled' ? r.value : null);
   const [newest, live] = loaded;
   const sectionPayloads = loaded.slice(2);
-  const key = i => i.streamId ?? i.url;
+  const key = liveKey;
   // A VRT NWS liveblog's summary points ("Kort samengevat"), by stream id: the
   // running liveblogs have them, the front page's teasers not.
   const points = new Map((live?.items ?? []).filter(i => i.paragraphs?.length).map(i => [key(i), i.paragraphs]));
@@ -80,7 +81,8 @@ export async function getFrontpage({
     }
     return out;
   };
-  const leads = liveFirst ? fresh(liveOf(front.value, newest)) : [];
+  // The others stay where the front page has them, if it has them.
+  const leads = liveFirst ? take(inOrder(liveOf(front.value, newest), liveOrder), liveLeads) : [];
 
   return {
     source: { id: p.id, name: p.name, language: p.language, homepage: p.homepage },
@@ -99,7 +101,8 @@ export async function getFrontpage({
 }
 
 // What Customize's Sources pane lists from the news: `live`, the running live
-// stories in the order liveFirst leads the front page with them, and
+// stories, newest first, each with its `key` (the pane puts those in
+// liveOrder first, as getFrontpage does, so it follows a change at once), and
 // `sections`, the first `perSection` stories of each of the provider's
 // sections ({id: [Story]}) in its feed's order (the front page's row leaves
 // out those already above it).
@@ -114,7 +117,7 @@ export async function getHeadlines({ provider, perSection = 3 } = {}) {
   const story = item => toStory(item);
   return {
     provider: p.id,
-    live: liveOf(front, newest).map(story),
+    live: inOrder(liveOf(front, newest), []).map(i => ({ ...story(i), key: liveKey(i) })),
     sections: Object.fromEntries(p.sections.map((s, i) => [s.id, (sections[i]?.items ?? []).slice(0, perSection).map(story)])),
   };
 }
@@ -123,6 +126,21 @@ export async function getHeadlines({ provider, perSection = 3 } = {}) {
 // the outlet's front-page feed leaves out (NYT's live blogs) from its newest.
 function liveOf(front, newest) {
   return newestOf([front, newest].map(s => s && { items: s.items.filter(isLive) }));
+}
+
+// What a story is kept by while it runs (liveOrder): a VRT NWS liveblog's
+// stream id, as its URL follows its headline; else its URL.
+export function liveKey(item) {
+  return item.streamId ?? item.url;
+}
+
+// The live stories in the order they lead: those in `order` (keys, first
+// first), then the others as they come (newest first); each story once.
+function inOrder(live, order) {
+  const seen = new Set();
+  const once = live.filter(i => !seen.has(liveKey(i)) && seen.add(liveKey(i)));
+  const at = i => { const n = order.indexOf(liveKey(i)); return n < 0 ? order.length : n; };
+  return once.map((i, n) => [i, n]).sort(([a, n], [b, m]) => at(a) - at(b) || n - m).map(([i]) => i);
 }
 
 function newestOf(payloads) {

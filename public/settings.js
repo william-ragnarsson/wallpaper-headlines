@@ -11,6 +11,10 @@ import { PRESETS } from './presets/index.js';
 export const MAX_MARGIN = 320;
 export const PICTURES = ['none', 'one', 'several'];
 export const MAX_DENSITY = 5;
+export const MAX_LIVE_LEADS = 10;
+// Live stories put in order on Customize, at most: the order is pruned to the
+// running ones at every save, so it stays short.
+export const MAX_LIVE_ORDER = 50;
 
 export const DEFAULTS = Object.freeze({
   // The design on the desktop.
@@ -19,6 +23,13 @@ export const DEFAULTS = Object.freeze({
   provider: PROVIDERS[0].id,
   // Whether running live stories (liveblogs, live pages) lead the front page.
   liveFirst: true,
+  // The live stories put in order on Customize, by key (Story.key), first
+  // first: they lead in this order while they run, the others after them,
+  // newest first. Empty for newest first.
+  liveOrder: [],
+  // How many live stories lead the front page, at most; the others stay where
+  // the provider has them.
+  liveLeads: 3,
   // Section streams below the front page, in order; the provider's own pick
   // when it changes.
   sections: PROVIDERS[0].defaultSections,
@@ -42,6 +53,9 @@ export const FIELDS = {
   provider: v => PROVIDERS.some(p => p.id === v),
   preset: (v, s) => PRESETS.some(p => p.id === v && (p.data === 'front' || getProvider(s.provider).liveblogs)),
   liveFirst: v => typeof v === 'boolean',
+  liveOrder: v => Array.isArray(v) && v.length <= MAX_LIVE_ORDER && v.every(k => typeof k === 'string' && k)
+    && new Set(v).size === v.length,
+  liveLeads: v => Number.isInteger(v) && v >= 1 && v <= MAX_LIVE_LEADS,
   sections: (v, s) => Array.isArray(v) && v.every(id => getProvider(s.provider).sections.some(x => x.id === id))
     && new Set(v).size === v.length,
   margin: v => Number.isInteger(v) && v >= 0 && v <= MAX_MARGIN,
@@ -66,7 +80,7 @@ export function normalize(saved) {
 
 // `patch` over `current`, stamped `now` (an ISO date). Throws for the whole
 // patch if any field in it is unknown or invalid. Another provider brings its
-// own sections, and a front-page design if the one in use
+// own sections and no live order, and a front-page design if the one in use
 // shows a liveblog it has not got, unless the patch says otherwise.
 export function apply(current, patch, now) {
   if (!patch || typeof patch !== 'object' || Array.isArray(patch)) throw new HttpError(400, 'Expected a JSON object');
@@ -85,7 +99,7 @@ export function apply(current, patch, now) {
 }
 
 function providerDefaults(provider) {
-  return { provider, sections: getProvider(provider).defaultSections };
+  return { provider, sections: getProvider(provider).defaultSections, liveOrder: [] };
 }
 
 // What there is to pick from. Async, as the callers await it: `headlines`
@@ -98,6 +112,7 @@ export async function options(saved) {
     providers: PROVIDERS,
     maxMargin: MAX_MARGIN,
     maxDensity: MAX_DENSITY,
-    headlines: await getHeadlines({ provider: normalize(saved).provider }).catch(() => null),
+    maxLiveLeads: MAX_LIVE_LEADS,
+    headlines: await getHeadlines(normalize(saved)).catch(() => null),
   };
 }

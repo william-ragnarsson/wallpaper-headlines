@@ -108,6 +108,9 @@ defaults.
   provider: 'vrt-nws',           // the outlet the front page comes from, and the only one the app
                                  // fetches: 'vrt-nws', 'nyt', 'washington-post' or 'fox-news'
   liveFirst: true,               // running live stories (liveblogs, live pages) lead the front page
+  liveOrder: ['liveblog-…', …],  // the live stories to lead with first, by key (a liveblog's stream
+                                 // id, else its URL), first first; the others come newest first
+  liveLeads: 3,                  // how many live stories lead it at most, 1 to 10 (maxLiveLeads)
   sections: ['binnenland', …],   // section stream ids below the front page, in order; none to all
   margin: 104,                   // points kept blank at the right edge for the desktop's files and
                                  // folders (ctx.safe.right), 0 to 320; centered designs keep as much left
@@ -121,6 +124,7 @@ defaults.
 ```
 
 Defaults: `preset: 'newsprint'`, `provider: 'vrt-nws'`, `liveFirst: true`,
+`liveOrder: []`, `liveLeads: 3`,
 `sections: ['binnenland', 'buitenland', 'politiek', 'economie', 'sport', 'cultuur', 'wetenschap']`,
 `margin: 104`, `pictures: 'one'`, `color: false`, `density: 3`. The sections are the
 provider's own pick (its `frontpage.sections`).
@@ -130,7 +134,7 @@ each one sent replaces the saved value (arrays whole), and the keeper sets
 `updatedAt`. It saves all or nothing: an unknown key or an invalid value is
 turned down. A section id
 is the provider's stream of the same id. Another provider brings its own
-sections, and Newsprint if the design in use is a liveblog
+sections and no `liveOrder`, and Newsprint if the design in use is a liveblog
 design (those show VRT's liveblogs), unless the same change sets them.
 A settings file may still hold `liveblogs` and `otherLiveblogs` (picked
 liveblogs, before `liveFirst`): they are ignored when read, dropped on the next
@@ -163,9 +167,11 @@ Nothing in it is fetched.
   }],
   maxMargin: 320,
   maxDensity: 5,
+  maxLiveLeads: 10,
   headlines: {                   // the saved provider's live stories and each section's first ones
     provider: 'vrt-nws',         // (getHeadlines), for the Sources pane; null when the stored
-    live: [Story],               // news has not got that provider's front page
+    live: [Story],               // news has not got that provider's front page; live newest
+                                 // first, each with its `key` (liveOrder's)
     sections: { binnenland: [Story], … },  // up to 3 per section, by section id
   },
 }
@@ -189,9 +195,11 @@ new EventSource('/api/settings/events').addEventListener('settings', e => apply(
 `{ source, generatedAt, top, sections, live, latest }`, each list of `Story`:
 
 - `top` is the provider's own front page (its `frontpage.top` stream). With
-  `liveFirst`, the running live stories lead it, newest first: those on the
-  front page, and those the front page's feed leaves out but the site's newest
-  (`frontpage.latest`) has (NYT's home feed omits its live blogs).
+  `liveFirst`, up to `liveLeads` of the running live stories lead it: those in
+  `liveOrder` first, in that order, then the others newest first. They are
+  those on the front page, and those the front page's feed leaves out but the
+  site's newest (`frontpage.latest`) has (NYT's home feed omits its live
+  blogs). The ones that do not lead stay where the front page has them.
 - `sections` come in the settings order, each with up to 6 stories not already
   in `top` or an earlier section. A section that fails to load is left out.
 - `live` is the running liveblogs from `frontpage.live` (VRT NWS only), for the
@@ -202,7 +210,8 @@ new EventSource('/api/settings/events').addEventListener('settings', e => apply(
 
 `getHeadlines({ provider, perSection = 3 })` gives what Customize's Sources
 pane lists, from the same reader: `{ provider, live, sections }`, with `live`
-the running live stories in the order `liveFirst` leads `top` with them, and
+the running live stories, newest first, each with its `key` (the pane puts
+those in the saved `liveOrder` first, so it follows a change at once), and
 `sections` each of the provider's sections' first `perSection` stories, by
 section id (`{ us: [Story] }`). It throws when the news has not got the
 provider's front page. `options()` in public/settings.js passes it on as

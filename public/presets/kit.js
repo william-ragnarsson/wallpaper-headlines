@@ -83,6 +83,10 @@ export function page(root, ctx) {
 // items: Item[] }] } (a section with nothing left is left out). An Item is
 // { story, summary, points, picture, spare }: the summary and points to show,
 // the story's own image or null, and whether it is one of the spares.
+// For 'sections', `groups` counts the sections with something left: one with
+// nothing left gives its place to the next. It also tells the page
+// (ctx.reportSections) which sections had nothing left and how many `groups`
+// it had room for; the design marks the ones it shows (section()).
 export function plan(data, ctx, regions) {
   const used = new Set();
   const out = {};
@@ -114,9 +118,18 @@ export function plan(data, ctx, regions) {
     };
     const from = [spec.from ?? 'top'].flat();
     if (from.includes('sections')) {
-      out[name] = (data.sections ?? []).slice(0, at(ctx, spec.groups ?? Infinity))
-        .map(sec => ({ id: sec.id, name: sec.name, items: take(sec.stories ?? [], allowance()) }))
-        .filter(g => g.items.length);
+      const room = at(ctx, spec.groups ?? Infinity);
+      const groups = [];
+      const empty = [];
+      // Empty: one with nothing left, in the room or past it. The rest past
+      // it had no room.
+      for (const sec of data.sections ?? []) {
+        const items = groups.length < room ? take(sec.stories ?? [], allowance()) : null;
+        if (items?.length) groups.push({ id: sec.id, name: sec.name, items });
+        else if (items || !(sec.stories ?? []).some(ok)) empty.push(sec.id);
+      }
+      out[name] = groups;
+      ctx.reportSections?.({ empty, room: Number.isFinite(room) ? room : null });
     } else {
       out[name] = take(from.flatMap(f => data[f] ?? []), allowance());
     }
@@ -149,6 +162,14 @@ export function usable(img) {
 }
 
 // --- building ---------------------------------------------------------------
+
+// The element render() built for a section of plan()'s 'sections', marked
+// with its id (data-section): the page reads which made it onto the page,
+// after fitting, for Customize. A stand-in group (no id) stays unmarked.
+export function section(el, group) {
+  if (group?.id) el.dataset.section = group.id;
+  return el;
+}
 
 // Text that layout() may cut by words, and reset() puts back: a span of class
 // kit-t in a paragraph (with a run-in before it, if any).
