@@ -37,11 +37,15 @@ let usage = """
       --size points at --scale pixels a point (default: the main screen's).
       --follow picks the liveblog for the liveblog designs (default: the
       newest running one).
-      Prints {path, width, height, fetchedAt, page}: fetchedAt is when the
-      news drawn was fetched. Nothing is fetched while drawing. --settings are
-      changes to the saved settings for this picture only: checked as settings
-      set checks them, not saved, and printed as settings. --preset and
-      --follow pin the page over them.
+      Prints {path, width, height, fetchedAt, sections, page}: fetchedAt is
+      when the news drawn was fetched; sections is what the page did with the
+      picked sections, {shown, empty, room}: those on the picture, in page
+      order; those with nothing left to show; and how many places it had
+      (null for no cap). One in neither list was left out for room. sections
+      is null for a design that shows none. Nothing is fetched while drawing.
+      --settings are changes to the saved settings for this picture only:
+      checked as settings set checks them, not saved, and printed as
+      settings. --preset and --follow pin the page over them.
 
   settings
       Prints the settings, with the defaults for what settings.json does not have.
@@ -49,23 +53,27 @@ let usage = """
   settings set <key>=<value>…
       Saves the changes and prints the settings. A value is JSON, or else a
       string: preset=evening margin=80 provider=nyt sections='["sport"]'
-      liveFirst=false. Another provider brings its own sections. liveFirst
-      (default true) puts running live stories at the front of the top
-      stories; every story has live: true or false.
+      liveFirst=false liveLeads=2. Another provider brings its own sections
+      and no liveOrder. liveFirst (default true) puts running live stories at
+      the front of the top stories, liveLeads of them at most (default 3),
+      those in liveOrder (their keys, from options' headlines.live) first,
+      then the others newest first; every story has live: true or false.
       An unknown key or invalid value saves nothing and fails.
 
   options
       Prints what there is to pick from: presets, providers (VRT NWS, The New
       York Times, The Washington Post, Fox News) and their sections,
-      maxMargin, maxDensity, and headlines: from the stored news, for the
-      provider in the settings, the running live stories in the order
-      liveFirst leads with them and each section's first few stories (null
+      maxMargin, maxDensity, maxLiveLeads, and headlines: from the stored
+      news, for the provider in the settings, the running live stories, newest
+      first, each with its key, and each section's first few stories (null
       when the stored news is another provider's). Nothing is fetched.
 
-  pane sources --out <file.png> [--size 560x2400] [--appearance light|dark]
+  pane sources --out <file.png> [--size 560x2400] [--appearance light|dark] [--screen 1512x982]
       Draws Customize's Sources pane with the settings and stored news, as
-      the app shows it, and writes the PNG. Prints {path, width, height,
-      provider, fetchedAt}. Nothing is fetched, saved or shown on screen.
+      the app shows it, and writes the PNG. Which sections fit is the page's,
+      drawn first at --screen points (default 1512x982), as the preview is.
+      Prints {path, width, height, provider, fetchedAt, sections}, sections
+      as render prints it. Nothing is fetched, saved or shown on screen.
 
   Every command takes --data <folder> (default: .dev/ in this worktree), where
   settings.json and news.json are.
@@ -158,6 +166,7 @@ func render(_ arguments: Arguments, _ environment: Environment) async throws -> 
   let file = try FileOutput(URL(filePath: out)).put(snapshot)
   var result: [String: Any] = ["path": file.path(percentEncoded: false), "width": snapshot.width, "height": snapshot.height, "page": page.url!.absoluteString]
   result["fetchedAt"] = snapshot.fetchedAt
+  result["sections"] = snapshot.sections.map { ["shown": $0.shown, "empty": $0.empty, "room": $0.room ?? NSNull()] as [String: Any] } ?? NSNull()
   if let settings { result["settings"] = try object(settings) }
   return result
 }
