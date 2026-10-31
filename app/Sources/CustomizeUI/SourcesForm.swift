@@ -7,8 +7,9 @@ import WallpaperCore
 // running live stories lead the front page, and which of them first; and the
 // sections there are to add. All of it is the digest's, from the stored news
 // and the preview's picture; nothing here goes to the network. Each binding
-// saves the setting it is for: a drag saves the order as the rows make way,
-// so the drop finds it saved. A row drags within its list only.
+// saves the setting it is for: a drag saves the order once, as it drops, the
+// rows making way in the list alone until then. A row drags within its list
+// only.
 public struct SourcesForm: View {
   let digest: SourcesDigest
   @Binding var provider: String

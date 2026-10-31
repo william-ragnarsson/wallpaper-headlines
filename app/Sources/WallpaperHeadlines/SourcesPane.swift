@@ -20,7 +20,8 @@ struct SourcesPane: View {
       liveLeads: model.binding(settings, \.liveLeads),
       sections: model.binding(settings, \.sections))
     .task(id: model.previewKey(settings)) {
-      // A drag sends a few changes in a row: draw after a pause.
+      // Changes come a few in a row (a stepper, one drag after another):
+      // draw after a pause.
       try? await Task.sleep(for: .milliseconds(500))
       guard !Task.isCancelled else { return }
       await model.drawPreview()

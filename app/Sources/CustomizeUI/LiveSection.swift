@@ -37,17 +37,18 @@ struct LiveSection: View {
         if live.isEmpty {
           Text("None running now.").foregroundStyle(.secondary)
         } else {
-          ReorderStack(ids: rows(live.map(\.key), leading: leading), places: { places($0, in: live) }, ruled: { $0 != .line }) { row in
+          ReorderStack(ids: rows(live.map(\.key), leading: leading), places: { places($0, in: live) }, ruled: { $0 != .line }) { row, shown in
             switch row {
             case .line:
-              Cutoff(text: live.count < liveLeads ? "Lead with up to \(liveLeads)" : "Lead with \(liveLeads)", handle: true) {
+              Cutoff(text: lineText(at: shown.firstIndex(of: .line), of: live.count), handle: true) {
                 Stepper("Live stories that lead", value: $liveLeads, in: 1...max(1, digest.maxLiveLeads))
                   .labelsHidden()
                   .controlSize(.small)
               }
             case .story(let key):
               if let index = live.firstIndex(where: { $0.key == key }) {
-                LiveRow(story: live[index], place: leading.flatMap { index < $0 ? Self.place(index) : nil }, leads: leading.map { index < $0 } ?? true)
+                let (place, leads) = position(of: key, in: shown)
+                LiveRow(story: live[index], place: leads == true ? Self.place(place) : nil, leads: leads ?? true)
                   .contextMenu {
                     Button("Move Up") { set(digest.liveMoving(key, by: -1)) }
                       .disabled(index == 0)
@@ -91,6 +92,21 @@ struct LiveSection: View {
     var rows = keys.map(Row.story)
     if let leading { rows.insert(.line, at: leading) }
     return rows
+  }
+
+  // Where the story `key` is with the rows in the order `shown`, as one is
+  // dragged: its place among the stories, and whether it is above the line
+  // (nil: there is none, as they do not lead).
+  private func position(of key: String, in shown: [Row]) -> (Int, leads: Bool?) {
+    let at = shown.firstIndex(of: .story(key)) ?? 0
+    return (shown[..<at].filter { $0 != .line }.count, shown.firstIndex(of: .line).map { at < $0 })
+  }
+
+  // What the line says, under the first `index` of `count` stories as it
+  // shows; the setting can be more than there are.
+  private func lineText(at index: Int?, of count: Int) -> String {
+    let leads = index == leading ? liveLeads : index ?? liveLeads
+    return count < leads ? "Lead with up to \(leads)" : "Lead with \(leads)"
   }
 
   // Where a row can be dragged to, while the stories lead: a story to any

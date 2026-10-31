@@ -3,9 +3,10 @@ import SwiftUI
 // What shows on the wallpaper: the picked sections in the order of the row
 // below the lead stories, and the line where the design runs out of room for
 // them on this screen, by the preview's picture. Drag one to move it, the
-// rows making way as it goes; one dragged over the line sends the nearest on
-// the other side back over it, as the design has room for as many as
-// before. − takes one off; Categories below has the ones to add.
+// rows making way as it goes, numbered and dimmed as they show; one dragged
+// over the line sends the nearest on the other side back over it, as the
+// design has room for as many as before. − takes one off; Categories below
+// has the ones to add.
 struct PickedSections: View {
   let digest: SourcesDigest
   @Binding var sections: [String]
@@ -16,14 +17,14 @@ struct PickedSections: View {
         Text(digest.showsSections ? "None: the row below the lead stories fills with other news." : "None.")
           .foregroundStyle(.secondary)
       } else {
-        ReorderStack(ids: rows(digest.picked.map(\.id)), places: places, ruled: { $0 != .line }) { row in
+        ReorderStack(ids: rows(digest.picked.map(\.id)), places: places, ruled: { $0 != .line }) { row, shown in
           switch row {
           case .line:
             Cutoff(text: "No room on \(digest.design?.name ?? "this design") for the ones below", systemImage: "eye.slash")
           case .section(let id):
             if let index = digest.picked.firstIndex(where: { $0.id == id }) {
-              let section = digest.picked[index]
-              SectionRow(section: section, place: index + 1) {
+              let (section, place) = self.section(index, in: shown)
+              SectionRow(section: section, place: place) {
                 Button("Remove \(section.name)", systemImage: "minus.circle") { set(digest.removing(id)) }
                   .help("Take \(section.name) off the wallpaper")
               }
@@ -56,6 +57,18 @@ struct PickedSections: View {
     var rows = ids.map(Row.section)
     if let line = digest.lineIndex(in: ids) { rows.insert(.line, at: line) }
     return rows
+  }
+
+  // The picked section at `index` as it shows with the rows in the order
+  // `shown`, as one is dragged: its place among them, and whether there is
+  // room for it, by the side of the line it is on.
+  private func section(_ index: Int, in shown: [Row]) -> (SourcesDigest.Section, place: Int) {
+    var section = digest.picked[index]
+    let at = shown.firstIndex(of: .section(section.id)) ?? 0
+    if section.showing != nil, section.showing != .empty {
+      section.showing = shown.firstIndex(of: .line).map { $0 < at } == true ? .noRoom : .shown
+    }
+    return (section, shown[..<at].filter { $0 != .line }.count + 1)
   }
 
   // Where a section can be dragged to: any place, the line staying under as
