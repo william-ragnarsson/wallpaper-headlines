@@ -1,54 +1,35 @@
-import Combine
 import SwiftUI
 
-// The provider's sections that are not on the front page, to add: + puts one
-// at the end of the row, or drag it to its place above. One dragged down here
-// from above comes off the front page.
+// Categories: the provider's sections that are not on the wallpaper, to add:
+// + puts one at the end of the row, to drag to its place from there.
 struct OtherSections: View {
   let digest: SourcesDigest
   @Binding var sections: [String]
-  @StateObject private var drop = DropTarget()
 
   var body: some View {
-    let name = digest.provider?.name ?? "the provider"
     Section {
       if digest.others.isEmpty {
-        Text("All of \(name)’s sections are on the front page.")
+        Text("All of \(digest.provider?.name ?? "the provider")’s sections are on the wallpaper.")
           .foregroundStyle(.secondary)
-          .frame(maxWidth: .infinity, alignment: .leading)
-          .background { DropHighlight(on: drop.id == "") }
-          .dropDestination(for: String.self) { ids, _ in remove(ids) } isTargeted: { over in
-            drop.over(over, "")
-          }
       }
       ForEach(digest.others) { section in
-        SectionRow(section: section, place: nil, targeted: drop.id == section.id) {
+        SectionRow(section: section, handle: false) {
           Button("Add \(section.name)", systemImage: "plus.circle") { add(section.id) }
-            .help("Add \(section.name) to the front page")
-        }
-        .draggable(section.id) { DragLabel(name: section.name) }
-        .dropDestination(for: String.self) { ids, _ in remove(ids) } isTargeted: { over in
-          drop.over(over, section.id)
+            .help("Add \(section.name) at the end of the wallpaper’s row")
         }
         .contextMenu {
-          Button("Add to Front Page") { add(section.id) }
+          Button("Add to Wallpaper") { add(section.id) }
         }
       }
     } header: {
-      Text("Other sections from \(name)")
+      Text("Categories")
     } footer: {
-      Text("+ adds one at the end of the row; or drag it to its place above.")
+      Text("+ adds one at the end of the wallpaper’s row; drag it up to its place from there.")
     }
   }
 
   private func add(_ id: String) {
-    if let next = digest.placing(id, at: nil) { sections = next }
-  }
-
-  private func remove(_ ids: [String]) -> Bool {
-    drop.id = nil
-    guard let next = ids.first.flatMap(digest.removing) else { return false }
-    sections = next
-    return true
+    guard let next = digest.adding(id) else { return }
+    withAnimation(.snappy) { sections = next }
   }
 }

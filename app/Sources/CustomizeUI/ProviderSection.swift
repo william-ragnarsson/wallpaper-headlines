@@ -14,20 +14,19 @@ struct ProviderSection: View {
       }
       .pickerStyle(.menu)
       if let p = digest.provider {
-        if let description = p.description {
-          Text(description).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 4) {
+          if let description = p.description { Text(description) }
+          HStack(spacing: 4) {
+            Text("\(p.owner) · \(Locale.current.localizedString(forLanguageCode: p.language) ?? p.language) ·")
+            Link(p.homepage.host() ?? p.homepage.absoluteString, destination: p.homepage)
+          }
+          .font(.caption)
         }
-        LabeledContent("Publisher", value: p.owner)
-        LabeledContent("Language", value: Locale.current.localizedString(forLanguageCode: p.language) ?? p.language)
-        LabeledContent("Website") {
-          Link(p.homepage.host() ?? p.homepage.absoluteString, destination: p.homepage)
-        }
+        .foregroundStyle(.secondary)
       }
       fetched
     } header: {
       Text("Provider")
-    } footer: {
-      Text("The app fetches the news of the provider picked only: every few minutes while the screen is on, and when you click Update news. A change here redraws the picture from the news fetched last; picking another provider fetches its news first.")
     }
   }
 
@@ -37,7 +36,7 @@ struct ProviderSection: View {
   private var fetched: some View {
     switch digest.news {
     case .current(let news):
-      LabeledContent("Fetched", value: Self.date(news.fetchedAt).map { $0.formatted(date: .abbreviated, time: .shortened) } ?? news.fetchedAt)
+      LabeledContent("Fetched", value: Self.date(news.fetchedAt).map(Self.when) ?? news.fetchedAt)
       if !news.errors.isEmpty {
         Text(news.errors.count == 1 ? "One feed did not load: it is kept from the fetch before, if that had it." : "\(news.errors.count) feeds did not load: they are kept from the fetch before, if that had them.")
           .foregroundStyle(.secondary)
@@ -48,6 +47,12 @@ struct ProviderSection: View {
     case .none:
       Text("No news fetched yet. Update news fetches it.").foregroundStyle(.secondary)
     }
+  }
+
+  // "14:42 · 3 min. ago", with the day when it was not today.
+  private static func when(_ date: Date) -> String {
+    let time = Calendar.current.isDateInToday(date) ? date.formatted(date: .omitted, time: .shortened) : date.formatted(date: .abbreviated, time: .shortened)
+    return "\(time) · \(Relative.text(date))"
   }
 
   private static func date(_ text: String) -> Date? {

@@ -1,33 +1,44 @@
 import SwiftUI
 import WallpaperCore
 
-// Customize → Sources (M5): what news the front page has, top to bottom as it
-// is on the desktop. The running live stories that lead it, the provider's
-// sections in the row below them, dragged into their order, the sections
-// there are to add, and last the provider they all come from. All of it is
-// the digest's, from the stored news; nothing here goes to the network. Each
-// binding saves the setting it is for.
+// Customize → Sources (M5): what news the wallpaper has. The provider it
+// comes from; its sections on the wallpaper in the order of the row below the
+// lead stories, and where the design runs out of room for them; whether the
+// running live stories lead the front page, and which of them first; and the
+// sections there are to add. All of it is the digest's, from the stored news
+// and the preview's picture; nothing here goes to the network. Each binding
+// saves the setting it is for: a drag saves the order once, as it drops, the
+// rows making way in the list alone until then. A row drags within its list
+// only.
 public struct SourcesForm: View {
   let digest: SourcesDigest
   @Binding var provider: String
   @Binding var liveFirst: Bool
+  @Binding var liveOrder: [String]
+  @Binding var liveLeads: Int
   @Binding var sections: [String]
 
-  public init(digest: SourcesDigest, provider: Binding<String>, liveFirst: Binding<Bool>, sections: Binding<[String]>) {
+  public init(digest: SourcesDigest, provider: Binding<String>, liveFirst: Binding<Bool>, liveOrder: Binding<[String]>,
+              liveLeads: Binding<Int>, sections: Binding<[String]>) {
     self.digest = digest
     _provider = provider
     _liveFirst = liveFirst
+    _liveOrder = liveOrder
+    _liveLeads = liveLeads
     _sections = sections
   }
 
   public var body: some View {
     Form {
-      LiveSection(digest: digest, liveFirst: $liveFirst)
+      ProviderSection(digest: digest, provider: $provider)
       if digest.provider != nil {
         PickedSections(digest: digest, sections: $sections)
+      }
+      LiveFirstSection(digest: digest, liveFirst: $liveFirst)
+      LiveSection(digest: digest, liveOrder: $liveOrder, liveLeads: $liveLeads)
+      if digest.provider != nil {
         OtherSections(digest: digest, sections: $sections)
       }
-      ProviderSection(digest: digest, provider: $provider)
     }
     .formStyle(.grouped)
   }

@@ -64,6 +64,9 @@ const els = {
 
 let preset = null;
 let presetId = null; // which preset `preset` is; state.preset runs ahead during a switch
+// What the page on screen planned for the sections: { empty, room } from
+// ctx.reportSections, for sectionsReport().
+let planned = null;
 const imageFallbacks = new Map();
 
 // ---------------------------------------------------------------------------
@@ -234,6 +237,7 @@ function render() {
     root.append(h('div', { class: 'wallpaper-status' }, state.error ? `${words.failed}: ${state.error}` : words.loading));
     return;
   }
+  planned = null;
   try {
     preset.render(root, state.data, makeContext());
     layout();
@@ -266,6 +270,9 @@ function makeContext() {
     pictures: state.settings?.pictures ?? 'one',
     color: state.settings?.color ?? false,
     density: state.settings?.density ?? 3,
+    // A design that shows sections says here which had nothing left to show
+    // and how many it had room for (kit.plan() does, for a template).
+    reportSections: facts => { planned = facts; },
     image,
     time,
     clock,
@@ -652,8 +659,8 @@ async function refresh(announce = false) {
 
 // What the app calls before each picture: catch up with the settings, fetch,
 // render, and wait until the fonts and images are in, so the picture is
-// complete. Resolves to { ok, error, fetchedAt, stories }; on an error the
-// page still shows the last news it had.
+// complete. Resolves to { ok, error, fetchedAt, sections, stories }; on an
+// error the page still shows the last news it had.
 async function update() {
   await ready;
   const settings = await host.loadSettings();
@@ -666,7 +673,36 @@ async function update() {
   tickClock();
   render();
   await settled();
-  return { ok: !state.error, error: state.error, fetchedAt: state.fetchedAt?.toISOString() ?? null, stories: onScreen() };
+  return { ok: !state.error, error: state.error, fetchedAt: state.fetchedAt?.toISOString() ?? null, sections: sectionsReport(), stories: onScreen() };
+}
+
+// What the page did with the picked sections, as drawn (after fitting), for
+// Customize: `shown`, those on the screen (data-section, kit.section()), in
+// page order; `empty`, those with nothing left to show (no stories, or all
+// taken by the regions before them); `room`, how many places for sections the
+// design had: as many as it shows when one with stories was left out, else
+// what it planned with (null for no cap). Null for a design without sections.
+function sectionsReport() {
+  if (!state.data || !PRESETS.find(p => p.id === presetId)?.sections) return null;
+  const screen = els.wallpaper.getBoundingClientRect();
+  const whole = el => {
+    const r = el.getBoundingClientRect();
+    return r.width > 0 && r.height > 0 && r.top >= screen.top - 1 && r.left >= screen.left - 1
+      && r.bottom <= screen.bottom + 1 && r.right <= screen.right + 1;
+  };
+  const shown = [...new Set([...els.wallpaper.querySelectorAll('[data-section]')].filter(whole).map(el => el.dataset.section))];
+  const stories = new Map((state.data.sections ?? []).map(s => [s.id, s.stories?.length ?? 0]));
+  const left = pickedSections().filter(id => !shown.includes(id));
+  const empty = left.filter(id => !stories.get(id) || planned?.empty.includes(id));
+  return { shown, empty, room: left.length > empty.length ? shown.length : planned?.room ?? null };
+}
+
+// The sections the page asked the front page for, in the order picked: the
+// settings' (or the provider's own), those the provider has (as getFrontpage).
+function pickedSections() {
+  const { provider, sections: picked } = frontSettings();
+  const p = sources.getProvider(provider);
+  return (picked ?? p.defaultSections).filter(id => p.sections.some(s => s.id === id));
 }
 
 // The stories the picture shows, in the design's order: [{ title, url }], one

@@ -23,8 +23,10 @@ public final class Renderer: NSObject, WKNavigationDelegate {
   // The one thing a render waits for at a time, a load or a refresh.
   private var waiting: (id: Int, continuation: CheckedContinuation<Void, Error>)?
   private var lastID = 0
-  // What the page's last refresh said about the news it drew.
+  // What the page's last refresh said about the news it drew, about the
+  // picked sections, and the stories it shows.
   private var fetchedAt: String?
+  private var sections: SectionsReport?
   private var stories: [Snapshot.Story] = []
   // Renders run one at a time, in the order asked: this ends after the last.
   private var queue: Task<Void, Never>?
@@ -103,6 +105,7 @@ public final class Renderer: NSObject, WKNavigationDelegate {
 
     do {
       fetchedAt = nil
+      sections = nil
       stories = []
       try await wait(seconds: 60) { id in
         webView.callAsyncJavaScript(Self.refresh, in: nil, in: .page) { [weak self] result in
@@ -110,6 +113,7 @@ public final class Renderer: NSObject, WKNavigationDelegate {
           let answer = try? result.get() as? [String: Any]
           if id == waiting?.id {
             fetchedAt = answer?["fetchedAt"] as? String
+            sections = SectionsReport(answer?["sections"])
             stories = Self.stories(answer?["stories"])
           }
           end(id, result.flatMap(Self.outcome))
@@ -134,7 +138,7 @@ public final class Renderer: NSObject, WKNavigationDelegate {
     }
     guard let png = NSBitmapImageRep(cgImage: cgImage).representation(using: .png, properties: [:]) else { throw RenderError.noImage }
     NSLog("Rendered \(cgImage.width)×\(cgImage.height) px for \(Int(request.size.width))×\(Int(request.size.height)) pt")
-    return Snapshot(png: png, width: cgImage.width, height: cgImage.height, fetchedAt: fetchedAt ?? stored?.meta.fetchedAt, stories: stories)
+    return Snapshot(png: png, width: cgImage.width, height: cgImage.height, fetchedAt: fetchedAt ?? stored?.meta.fetchedAt, sections: sections, stories: stories)
   }
 
   // `page` with data=store.
@@ -177,7 +181,7 @@ public final class Renderer: NSObject, WKNavigationDelegate {
     }
   }
 
-  // What the page's refresh resolved to: {ok, error, fetchedAt, stories}. Not ok means
+  // What the page's refresh resolved to: {ok, error, fetchedAt, sections, stories}. Not ok means
   // the news could not be loaded, and the picture on the desktop stays.
   private static func outcome(_ value: Any) -> Result<Void, Error> {
     let result = value as? [String: Any]
@@ -254,19 +258,31 @@ public struct RenderRequest: Sendable {
 }
 
 // A picture of the page: the PNG, its size in pixels, when the news on it
-// was fetched (an ISO date, from the page), and the stories it shows, in the
-// design's order (what the page marks with data-story, presets/README.md).
+// was fetched (an ISO date, from the page), what it did with the picked
+// sections (nil for a design that shows none), and the stories it shows, in
+// the design's order (what the page marks with data-story, presets/README.md).
 public struct Snapshot: Sendable {
   public let png: Data
   public let width: Int
   public let height: Int
   public let fetchedAt: String?
+  public let sections: SectionsReport?
   public let stories: [Story]
 
   // A story on the picture: its headline and its page.
   public struct Story: Sendable, Hashable {
     public let title: String
     public let url: URL
+  }
+}
+
+extension SectionsReport {
+  // From the page's answer; nil when it sent null or nothing.
+  init?(_ value: Any?) {
+    guard let value = value as? [String: Any],
+          let shown = value["shown"] as? [String],
+          let empty = value["empty"] as? [String] else { return nil }
+    self.init(shown: shown, empty: empty, room: value["room"] as? Int)
   }
 }
 

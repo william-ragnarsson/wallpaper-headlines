@@ -63,10 +63,11 @@ news there is to pick from in `news.json`; then the page is drawn from that
 only draws again, unless it picks another provider (the store holds only the
 one picked): that is fetched first. The page's one call is
 `window.wallpaper.refresh()`: it renders and resolves to `{ ok, error,
-fetchedAt, stories }` once fonts and images are in. When it is not ok, the app keeps the
+fetchedAt, sections, stories }` once fonts and images are in. When it is not ok, the app keeps the
 picture it has. `stories` are the articles the picture shows, the ones the
 design marks with `data-story` that fitting left in view (`public/presets/README.md`);
-the menu bar lists them under Articles.
+the menu bar lists them under Articles. `sections` is what it did with the
+picked sections, for Customize's Sources pane (the same README, Templates, 4).
 
 ## Run
 

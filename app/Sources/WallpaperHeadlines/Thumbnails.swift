@@ -44,8 +44,13 @@ final class Thumbnails {
       if design.color != true { drawn.color = false }
       if design.density != true { drawn.density = 3 }
       if design.sections != true { drawn.sections = [] }
-      // liveFirst orders the top stories, which every front-page design shows.
-      if design.data != "front" { drawn.liveFirst = true }
+      // The live settings order the top stories, which every front-page
+      // design shows.
+      if design.data != "front" {
+        drawn.liveFirst = true
+        drawn.liveOrder = []
+        drawn.liveLeads = 3
+      }
       self.settings = drawn
       self.fetchedAt = fetchedAt
       width = screen.width

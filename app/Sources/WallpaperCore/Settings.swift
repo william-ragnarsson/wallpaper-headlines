@@ -6,6 +6,8 @@ public struct WallpaperSettings: Codable, Hashable, Sendable {
   public var preset: String
   public var provider: String
   public var liveFirst: Bool
+  public var liveOrder: [String]  // live stories' keys (Story.key) put in order, first first
+  public var liveLeads: Int  // how many live stories lead, 1 to maxLiveLeads
   public var sections: [String]
   public var margin: Int
   public var pictures: String  // none, one or several
@@ -52,5 +54,6 @@ public struct Options: Codable, Sendable {
   public let providers: [Provider]
   public let maxMargin: Int
   public let maxDensity: Int
+  public let maxLiveLeads: Int
   public let headlines: Headlines?  // from the stored news (Headlines.swift)
 }

@@ -74,6 +74,7 @@ shows the list, and `wallpaper-dev render` prints it as `stories`.
 | `ctx.pictures` | how many photos the settings ask for: `'none'`, `'one'` (the default) or `'several'`. A design that follows it says `pictures: true` in `index.js` |
 | `ctx.color` | `true` for photos in color, `false` (the default) for black and white. A design that follows it says `color: true` in `index.js` |
 | `ctx.density` | 1 to 5 (3 by default): from more headlines with little text (1) to fewer stories with more text each (5). A design that follows it says `density: true` in `index.js`; a template reads it through `kit.at()` (Templates) |
+| `ctx.reportSections({ empty, room })` | for a design that shows sections (`sections: true` in `index.js`): the ids of the picked sections that had nothing left to show (all their stories taken higher up the page), and how many sections it had room for (`null` for no cap). `kit.plan()` calls it for a `'sections'` region; see Templates, 4 |
 | `ctx.lang` | the page's language as a BCP 47 tag, the provider's: `nl-BE` (VRT NWS) or `en-US` (the US outlets). For the `lang` attribute |
 | `ctx.t` | the page's own words in that language: `nameplate` (`Het Nieuws` / `The News`), `updated`, `source`, `live`, `liveNow`, `posts`, `new`, `video`, `latest`, `justIn`, `moreNews`, `allStories`, `frontPage`, `noNews`, `yesterday`, `colophon(name)`. Never write a word of the page's own in a preset |
 | `ctx.time(ts)` | newsroom time: `20u38` in Dutch, `8:38 PM` in English |
@@ -93,11 +94,12 @@ are trimmed plain text.
 
 The settings picked on Customize shape it, and a preset keeps their order:
 
-- `top` is the provider's front page. With "Running live stories first"
-  (`liveFirst`, on by default) it starts with the running live stories, newest
-  first: liveblogs, and live pages (NYT, Washington Post, Fox News) that are
+- `top` is the provider's front page. With "Lead with live stories"
+  (`liveFirst`, on by default) it starts with up to `liveLeads` running live
+  stories, those picked first on Customize (`liveOrder`) then the newest:
+  liveblogs, and live pages (NYT, Washington Post, Fox News) that are
   articles with `live: true`. Then the front page follows, so `top[0]` is the
-  newest live story, else the provider's own lead. Show the Live mark for any
+  first live story, else the provider's own lead. Show the Live mark for any
   story with `live: true`, whatever its `kind`.
 - `sections` are the ones picked there, in the order picked: any of the
   section streams, possibly none. Show them in that order; do not sort them or
@@ -183,7 +185,7 @@ page once: a region skips what one before it took.
 
 | key | what |
 |---|---|
-| `from` | `'top'`, `'latest'`, `'live'` or `'sections'`, or a list of them taken in turn. `'sections'` gives `[{ id, name, items }]`, in the order picked on Customize, a section with nothing left left out |
+| `from` | `'top'`, `'latest'`, `'live'` or `'sections'`, or a list of them taken in turn. `'sections'` gives `[{ id, name, items }]`, in the order picked on Customize, a section with nothing left left out; build each with `kit.section(el, group)` |
 | `stories` | how many at most (per section for `'sections'`) |
 | `groups` | `'sections'` only: how many sections at most |
 | `spares` | how many more it takes as spares: they start hidden and come in when there is room (`fill`) |
@@ -224,7 +226,8 @@ and `--density` (0 at 1, 1 at 5). From `kit.css`:
 
 Also for `render()`: `kit.prose(ctx, text, cls)` (a paragraph whose text the
 fitting can cut: build every summary and point with it), `kit.typo(title)`
-(curly quotes, dashes, ellipses), `kit.when(story, ctx)`, `kit.storyKey(story)`.
+(curly quotes, dashes, ellipses), `kit.when(story, ctx)`, `kit.storyKey(story)`,
+and `kit.section(el, group)` (4, below).
 
 ### 3. Fitting, in `layout()`
 
@@ -251,6 +254,33 @@ The order is the template's own: what gives way first. In Headlines, for
 example, tier two's summaries are cut first, then the lead's summary, then
 tier two's pictures, then the lead's photo; the lead's headline then grows
 (`fitSize`) into what room is left, and the index takes the rest in full rows.
+
+### 4. Which sections made it on
+
+Customize's Sources pane says which of the picked sections reach the
+wallpaper, and why the others do not. A design with `sections: true` tells
+it: `kit.section(el, group)` marks the element it built for a group of
+`'sections'` with the group's id (`data-section`), and `kit.plan()` reports
+which picked sections had nothing left and how many `groups` it planned
+(`ctx.reportSections`). After the last fitting the page counts a marked
+element as shown when it is on the screen, not hidden. A group without an
+id (a design's own stand-in, such as Homepage's topics, which fill its row
+when the sections are too few) stays unmarked: it is not a section.
+
+`window.wallpaper.refresh()` then resolves with `sections`:
+
+```js
+sections: {
+  shown: ['politiek', 'sport'],   // on the picture, in page order
+  empty: ['binnenland'],          // nothing left to show: no stories, or all taken higher up
+  room: 5,                        // places for sections: as many as shown when one with stories
+                                  // was left out, else the groups planned (null for no cap)
+} | null                          // null for a design without sections: true
+```
+
+A picked section in neither list was left out for room. A design that fits
+its sections away in `layout()` needs nothing more: what fitting hid does not
+count.
 
 ### Checking a template
 

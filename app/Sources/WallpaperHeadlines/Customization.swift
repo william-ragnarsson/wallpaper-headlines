@@ -23,6 +23,10 @@ final class Customization {
   private(set) var rendering = false  // the app is fetching or redrawing the desktop picture
   private(set) var preview: NSImage?
   private(set) var previewError: String?
+  // What the preview's page did with the picked sections, for the Sources
+  // pane; nil for a design that shows none, and for a page from a server,
+  // which reads its own settings.
+  private(set) var sectionsReport: SectionsReport?
   // The screen with the menu bar, which the desktop picture is drawn for.
   var screen = CGSize(width: 1512, height: 982)
 
@@ -97,16 +101,28 @@ final class Customization {
       guard !Task.isCancelled, self.renderer === renderer else { return }
       preview = NSImage(data: snapshot.png)
       previewError = nil
+      sectionsReport = server == nil ? snapshot.sections : nil
     } catch StoreError.empty {
       guard self.renderer === renderer else { return }
       preview = nil
       previewError = "No news fetched yet. Update news fetches it."
+      sectionsReport = nil
     } catch {
       guard !Task.isCancelled, self.renderer === renderer else { return }
       // Not the picture before, which was for other settings.
       preview = nil
       previewError = error.localizedDescription
+      sectionsReport = nil
     }
+  }
+
+  // What the preview is drawn from, for `settings` as the window has them:
+  // when it changes, the panes that need the preview draw it again. When the
+  // settings were saved does not change the picture.
+  func previewKey(_ settings: WallpaperSettings) -> PreviewKey {
+    var drawn = settings
+    drawn.updatedAt = nil
+    return PreviewKey(settings: drawn, screen: screen, page: page, fetchedAt: news?.fetchedAt)
   }
 
   // The small picture of `design` with the settings in the window, as the
@@ -137,6 +153,7 @@ final class Customization {
     thumbnails.closed()
     preview = nil
     previewError = nil
+    sectionsReport = nil
   }
 
   // Settings loaded, unless a change was made since the load began: that
@@ -193,12 +210,21 @@ final class Customization {
   }
 }
 
+struct PreviewKey: Equatable {
+  let settings: WallpaperSettings
+  let screen: CGSize
+  let page: URL
+  let fetchedAt: String?
+}
+
 // What a save sends: only the fields changed here since the last save, so a
 // change made to the file meanwhile stays. Fields left nil are left out.
 private struct Patch: Encodable {
   var preset: String?
   var provider: String?
   var liveFirst: Bool?
+  var liveOrder: [String]?
+  var liveLeads: Int?
   var sections: [String]?
   var margin: Int?
   var pictures: String?
@@ -209,6 +235,8 @@ private struct Patch: Encodable {
     if s.preset != old?.preset { preset = s.preset }
     if s.provider != old?.provider { provider = s.provider }
     if s.liveFirst != old?.liveFirst { liveFirst = s.liveFirst }
+    if s.liveOrder != old?.liveOrder { liveOrder = s.liveOrder }
+    if s.liveLeads != old?.liveLeads { liveLeads = s.liveLeads }
     if s.sections != old?.sections { sections = s.sections }
     if s.margin != old?.margin { margin = s.margin }
     if s.pictures != old?.pictures { pictures = s.pictures }
@@ -217,8 +245,8 @@ private struct Patch: Encodable {
   }
 
   var isEmpty: Bool {
-    preset == nil && provider == nil && liveFirst == nil && sections == nil && margin == nil
-      && pictures == nil && color == nil && density == nil
+    preset == nil && provider == nil && liveFirst == nil && liveOrder == nil && liveLeads == nil
+      && sections == nil && margin == nil && pictures == nil && color == nil && density == nil
   }
 
   // These fields over the others, as SettingsService does with a patch.
@@ -227,6 +255,8 @@ private struct Patch: Encodable {
     s.preset = preset ?? s.preset
     s.provider = provider ?? s.provider
     s.liveFirst = liveFirst ?? s.liveFirst
+    s.liveOrder = liveOrder ?? s.liveOrder
+    s.liveLeads = liveLeads ?? s.liveLeads
     s.sections = sections ?? s.sections
     s.margin = margin ?? s.margin
     s.pictures = pictures ?? s.pictures

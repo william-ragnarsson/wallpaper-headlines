@@ -249,9 +249,9 @@ function sectionIndex(index, per, ctx) {
     h('h5', { class: 'np-entry-hed' }, liveTag(s, ctx), newTag(s, ctx), kit.typo(s.title)),
     kit.when(s, ctx) ? h('p', { class: 'np-entry-meta' }, kit.when(s, ctx)) : null);
   return h('footer', { class: 'np-index', '--n': groups.length, '--per': per },
-    groups.map(g => h('section', { class: 'np-entry' },
+    groups.map(g => kit.section(h('section', { class: 'np-entry' },
       h('p', { class: 'np-entry-label' }, g.name),
-      h('div', { class: 'np-entry-items' }, g.items.map(item)))));
+      h('div', { class: 'np-entry-items' }, g.items.map(item))), g)));
 }
 
 // --- layout: fit and fill ---------------------------------------------------

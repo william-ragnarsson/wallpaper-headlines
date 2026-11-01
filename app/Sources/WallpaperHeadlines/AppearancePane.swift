@@ -24,7 +24,7 @@ struct AppearancePane: View {
       } header: {
         VStack(alignment: .leading, spacing: 8) {
           DesktopPreview(model: model, screen: screen)
-            .task(id: previewKey) {
+            .task(id: model.previewKey(settings)) {
               // A slider sends a few changes in a row: draw after a pause.
               try? await Task.sleep(for: .milliseconds(500))
               guard !Task.isCancelled else { return }
@@ -41,14 +41,6 @@ struct AppearancePane: View {
       widthSection(design)
     }
     .formStyle(.grouped)
-  }
-
-  // The settings as the window has them, saved or not; when they were saved
-  // does not change the picture.
-  private var previewKey: PreviewKey {
-    var drawn = settings
-    drawn.updatedAt = nil
-    return PreviewKey(settings: drawn, screen: model.screen, page: model.page, fetchedAt: model.news?.fetchedAt)
   }
 
   // The designs that follow one liveblog only for a provider that has them.
@@ -242,12 +234,4 @@ private struct DesignCard: View {
     .buttonStyle(.plain)
     .accessibilityAddTraits(selected ? .isSelected : [])
   }
-}
-
-// What the preview is drawn from: when one of these changes, it is drawn again.
-private struct PreviewKey: Equatable {
-  let settings: WallpaperSettings
-  let screen: CGSize
-  let page: URL
-  let fetchedAt: String?
 }
